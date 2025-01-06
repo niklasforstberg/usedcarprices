@@ -1,0 +1,1 @@
+This script tries to automate the process of finding out what a fair price for a given car might be. It is based on the swedish used car market.
