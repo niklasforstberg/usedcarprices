@@ -1,3 +1,94 @@
 This project is being run on an old macbook pro, using macos 12.
 
-The IDE is Cursor.
+The IDE is Cursor. 
+
+Be kind to the server we are scraping - always use a delay between each request.
+
+Be carefule when writing code - only change the code that is necessary.
+
+The site is in Swedish and therefore uses a mix of Swedish and English.
+
+The site uses reCaptcha. The site is part of the Schibsted group.
+
+#First page
+https://www.bytbil.com/
+
+#Search page url example
+Request URL:
+https://www.bytbil.com/bil?VehicleType=bil&Makes=ARIEL&Models=Atom&FreeText=&SortParams.SortField=publishedDate&SortParams.IsAscending=False
+Request Method:
+GET
+Status Code:
+200 OK
+Remote Address:
+3.164.230.62:443
+Referrer Policy:
+strict-origin-when-cross-origin
+
+Response Headers:
+content-encoding:
+gzip
+content-security-policy:
+frame-ancestors 'none'
+content-type:
+text/html; charset=utf-8
+date:
+Mon, 06 Jan 2025 14:37:34 GMT
+strict-transport-security:
+max-age=31536000; includeSubDomains
+vary:
+Accept-Encoding
+via:
+1.1 7146458eabc0c79851363d3a7ad4d72c.cloudfront.net (CloudFront)
+x-amz-cf-id:
+fEBdrfvLjHb-cQAGOQoKTmuD0agryGwId-AlO1IPPEqaepon0pkWcQ==
+x-amz-cf-pop:
+ARN53-P1
+x-cache:
+Miss from cloudfront
+x-frame-options:
+SAMEORIGIN
+:authority:
+www.bytbil.com
+:method:
+GET
+:path:
+/bil?VehicleType=bil&Makes=ARIEL&Models=Atom&FreeText=&SortParams.SortField=publishedDate&SortParams.IsAscending=False
+:scheme:
+https
+accept:
+text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7
+accept-encoding:
+gzip, deflate, br, zstd
+accept-language:
+en-GB,en-US;q=0.9,en;q=0.8,sv;q=0.7
+cookie:
+_hjSessionUser_1809422=eyJpZCI6IjMzODRjNGEyLTA5NTgtNWY5OC1iYzI4LWU3OWQyNmU3NWVjMCIsImNyZWF0ZWQiOjE3MzYxNzExNjEwNDYsImV4aXN0aW5nIjp0cnVlfQ==; _hjSession_1809422=eyJpZCI6IjI1NDU1NGMzLWI2NDUtNGU1Ni1hZTQ3LTg1ZjNlYWZiN2E2OCIsImMiOjE3MzYxNzExNjEwNDcsInMiOjEsInIiOjAsInNiIjowLCJzciI6MCwic2UiOjAsImZzIjoxLCJzcCI6MH0=; takeover=true; _cmp_marketing=1; _cmp_analytics=1; _cmp_advertising=1; _cmp_personalisation=1; consentUUID=ee10e6af-5410-4de8-9eec-bffd5350f50c_38_39; consentDate=2025-01-06T13:46:04.201Z; _pulse2data=7a58f9b0-cdca-416d-9dd4-39d0103b46d8%2Cv%2C%2C1736775966000%2CeyJpc3N1ZWRBdCI6IjIwMjUtMDEtMDZUMTM6NDY6MDJaIiwiZW5jIjoiQTEyOENCQy1IUzI1NiIsInJlSXNzdWVkQXQiOiIyMDI1LTAxLTA2VDEzOjQ2OjA2WiIsImFsZyI6ImRpciIsImtpZCI6IjIifQ..4wenWxOimSboLyvb94YAIQ.BVhzfKRNQS3rfxP6Kk6uQ0KpS2YN2B7Ju8WWv21kDnGFovYmJgFyno77wJTPQxTlRO-0FrwyEoPXTBd6ZKiVkrVJTvJJkCCBgxobvhVm8BZmOw0rFjBFzCRtvVsS_UZqpMgbcNKg7ZOW7U2hfdCwJyVPUDIYkaL0jFiWuJ0G6eS1UVz-4B0q89pbEnY2jEteiy3fGVKNDdDQcLbM6PNf-HNmjWZXrNBXEM8aq3Gxb_3Cm_hhBD3hud0oLN-1gEkzbpzBUSmWy2uduR-XHAHhWtOsn1pbrQWxWYgyl0yWmaSs7iGxnP-KI7bibvQGsU7R7Qv4RSq6nXm_fGdynyrfX58p1MNLBYNWFL1w7vIA2dbPzB0vOMNvTBVhgd5neOxI._6pEej0uxjAznSCL8qMLgw%2C5829524340945281193%2C1736185566530%2Ctrue%2C%2CeyJraWQiOiIyIiwiYWxnIjoiSFMyNTYifQ..XrPgHvl-X4sIysaLznY4Iv3uMRin24yrBR_rlJBRnFQ; __codnp=; __gads=ID=e3ff70dc61037351:T=1736171164:RT=1736174129:S=ALNI_MY2Cmg3uRG42mf9Kq0shi0Y_EEYKg; __gpi=UID=00000fa80769d8f4:T=1736171164:RT=1736174129:S=ALNI_MZCrpBGxvOtTJ6lPb5DTZkQG25YLg; __eoi=ID=b5a7f9c24035b8f6:T=1736171164:RT=1736174129:S=AA-AfjaxbfhN4jFwvhTuNvyGlz7n; .AspNetCore.Antiforgery.VyLW6ORzMgk=CfDJ8FD1BSny11tLsgLIUKTDhtYcPx0drn-yMY2U5ZknvWeMs8axk2x8QTZQF8OwUKul2m3X0TxLXvBJTzLzk0m5t6e-Xjkjp6Mwn3sVixaWsac_GKRjqzzBvIeZgE498auvHDQSB184S97bhw0lFN67_rk; _sg_b_p=%2Fbil%2C%2Fbil%2C%2Fvastra-gotalands-lan%2Fpersonbil-atom-3-aero-kit-6790-17786151%2C%2F%2C%2F; _pulsesession=%5B%22sdrn%3Aschibsted%3Asession%3Ab5c4420d-e6db-41e9-8f57-09bafc999f6a%22%2C1736173596390%2C1736174230982%5D; _sg_b_v=1%3B652%3B1736173596
+priority:
+u=0, i
+referer:
+https://www.bytbil.com/
+sec-ch-ua:
+"Google Chrome";v="131", "Chromium";v="131", "Not_A Brand";v="24"
+sec-ch-ua-mobile:
+?0
+sec-ch-ua-platform:
+"macOS"
+sec-fetch-dest:
+document
+sec-fetch-mode:
+navigate
+sec-fetch-site:
+same-origin
+sec-fetch-user:
+?1
+upgrade-insecure-requests:
+1
+user-agent:
+Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36
+
+#I am pretty sure there is an api here:
+https://www.bytbil.com/api/
+
+#I am pretty sure there is a reCaptcha here:
+https://www.recaptcha.net/recaptcha/api.js?onload=recaptchaCallback&render=6Lfq1aQUAAAAAFEQDUblSI0TQm2Zp5Q9VK4tJoE7
