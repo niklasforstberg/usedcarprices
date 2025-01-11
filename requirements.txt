@@ -1,0 +1,8 @@
+requests
+beautifulsoup4
+fake-useragent
+aiohttp
+pandas
+matplotlib
+seaborn
+scikit-learn
