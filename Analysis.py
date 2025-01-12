@@ -7,8 +7,8 @@ import numpy as np
 from sklearn.linear_model import LinearRegression
 
 # Define your filters here
-MAKE = "Toyota"  # Set to None to see all makes
-MODEL = "Avensis"    # Set to None to see all models for the selected make
+MAKE = "Tesla"  # Set to None to see all makes
+MODEL = "Model Y"    # Set to None to see all models for the selected make
 
 def load_car_data(make=None, model=None):
     conn = sqlite3.connect('cars.db')
@@ -148,6 +148,25 @@ def predict_car_price(make=None, model=None):
     print(f"Price decrease per year: {model.coef_[1]:,.0f} kr")
     print(f"R² score: {model.score(X, y):.3f}")
     
+    # Interactive prediction
+    print("\n=== Price Prediction Calculator ===")
+    while True:
+        try:
+            mileage = float(input("Enter mileage (mil): "))
+            age = float(input("Enter age (years): "))
+            prediction_data = pd.DataFrame([[mileage, age]], columns=['mileage', 'age'])
+            predicted_price = model.predict(prediction_data)[0]
+            print(f"\nPredicted price: {predicted_price:,.0f} kr")
+            
+            # Calculate prediction interval (simplified)
+            residuals = y - model.predict(X)
+            std_dev = np.std(residuals)
+            print(f"Price range: {(predicted_price - 2*std_dev):,.0f} kr to {(predicted_price + 2*std_dev):,.0f} kr")
+            
+            break
+        except ValueError:
+            print("Please enter valid numbers")
+    
     # Create visualization
     plt.figure(figsize=(12, 5))
     
@@ -177,26 +196,6 @@ def predict_car_price(make=None, model=None):
     
     plt.tight_layout()
     plt.show()
-    
-    # Interactive prediction
-    print("\n=== Price Prediction Calculator ===")
-    while True:
-        try:
-            mileage = float(input("Enter mileage (mil): "))
-            age = float(input("Enter age (years): "))
-            # Create DataFrame with named features
-            prediction_data = pd.DataFrame([[mileage, age]], columns=['mileage', 'age'])
-            predicted_price = model.predict(prediction_data)[0]
-            print(f"\nPredicted price: {predicted_price:,.0f} kr")
-            
-            # Calculate prediction interval (simplified)
-            residuals = y - model.predict(X)
-            std_dev = np.std(residuals)
-            print(f"Price range: {(predicted_price - 2*std_dev):,.0f} kr to {(predicted_price + 2*std_dev):,.0f} kr")
-            
-            break
-        except ValueError:
-            print("Please enter valid numbers")
 
 if __name__ == "__main__":
     predict_car_price(MAKE, MODEL)

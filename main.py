@@ -264,8 +264,8 @@ async def main():
     url = 'https://www.bytbil.com/bil'
     params = {
         'VehicleType': 'bil',
-        'Makes': 'Toyota',
-        'Models': ['Avensis'],
+        'Makes': 'Tesla',
+        'Models': ['Model Y'],
         'FreeText': '',
         'Regions': '',  # URL encoding handled automatically
         'PriceRange.From': '',
