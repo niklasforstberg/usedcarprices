@@ -132,6 +132,7 @@ def store_car(conn, car_data):
     
     if result:
         # Update existing car
+        print(f"Updating existing car: {car_data['title']} (First seen: {first_seen})")
         car_id, first_seen = result
         c.execute('''
             UPDATE cars 
@@ -197,6 +198,9 @@ async def parse_cars(html_content, conn, session, headers):
         return 0
     
     cars_found = 0
+    new_cars = 0
+    updated_cars = 0
+    
     for car in car_items:
         # Get title and URL
         title_elem = car.find('h3', {'class': 'car-list-header'})
@@ -243,10 +247,26 @@ async def parse_cars(html_content, conn, session, headers):
         if car_details:
             car_data.update(car_details)
         
+        # Check if car exists before storing
+        c = conn.cursor()
+        c.execute('SELECT id FROM cars WHERE registration_number = ? OR url = ?', 
+                 (car_data.get('registration_number'), car_data['url']))
+        exists = c.fetchone()
+        
         store_car(conn, car_data)
         cars_found += 1
         
+        if exists:
+            updated_cars += 1
+        else:
+            new_cars += 1
+        
         print(f"Processed: {title} ({car_data.get('registration_number', 'N/A')}) - Price: {price}")
+    
+    print(f"\nSummary:")
+    print(f"Total cars processed: {cars_found}")
+    print(f"New cars added: {new_cars}")
+    print(f"Existing cars updated: {updated_cars}")
     
     return cars_found
 
@@ -260,8 +280,9 @@ def log_scraping_run(conn, cars_found, search_params):
 
 async def main():
     conn = setup_database()
+    base_url = 'https://www.bytbil.com/bil'
     
-    url = 'https://www.bytbil.com/bil'
+    # Initial params remain the same
     params = {
         'VehicleType': 'bil',
         'Makes': 'Tesla',
@@ -287,7 +308,6 @@ async def main():
         'SortParams.IsAscending': 'False'
     }
     
-    # Create headers with random user agent
     ua = UserAgent()
     headers = {
         'User-Agent': ua.random,
@@ -296,11 +316,37 @@ async def main():
     }
 
     async with aiohttp.ClientSession() as session:
-        response = await session.get(url, params=params, headers=headers)
-        if response.status == 200:
-            html_content = await response.text()
-            cars_found = await parse_cars(html_content, conn, session, headers)
-            log_scraping_run(conn, cars_found, params)
+        page = 1
+        total_cars = 0
+        
+        while True:
+            # Add page parameter for pagination
+            params['Page'] = page
+            params['IgnoreSortFiltering'] = False
+            
+            response = await session.get(base_url, params=params, headers=headers)
+            if response.status == 200:
+                html_content = await response.text()
+                
+                # Parse cars on current page
+                cars_found = await parse_cars(html_content, conn, session, headers)
+                total_cars += cars_found
+                
+                # Check if we should continue to next page
+                if cars_found == 0:  # No more cars found on this page
+                    break
+                    
+                print(f"Processed page {page}, found {cars_found} cars")
+                page += 1
+                
+                # Add human-like delay between pages
+                await human_like_delay()
+            else:
+                print(f"Error fetching page {page}: {response.status}")
+                break
+    
+        print(f"Total cars processed: {total_cars}")
+        log_scraping_run(conn, total_cars, params)
     
     conn.close()
 
