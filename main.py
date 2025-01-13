@@ -132,7 +132,7 @@ def store_car(conn, car_data):
     
     if result:
         # Update existing car
-        print(f"Updating existing car: {car_data['title']} (First seen: {first_seen})")
+        print(f"Updating existing car: {car_data['title']} ")
         car_id, first_seen = result
         c.execute('''
             UPDATE cars 
@@ -282,11 +282,11 @@ async def main():
     conn = setup_database()
     base_url = 'https://www.bytbil.com/bil'
     
-    # Initial params remain the same
-    params = {
+    # Initial params - updated format for aiohttp
+    first_page_params = {
         'VehicleType': 'bil',
         'Makes': 'Tesla',
-        'Models': ['Model Y'],
+        'Models': 'Model Y',
         'FreeText': '',
         'Regions': '',  # URL encoding handled automatically
         'PriceRange.From': '',
@@ -300,12 +300,34 @@ async def main():
         'Gearboxes': '',  # Can be: Manuell, Automatisk
         'EnginePowerRange.From': '',
         'EnginePowerRange.To': '',
-        'ShowLeasingOffers': 'False',
+        'ShowLeasingOffers': 'false',
         'ShowImportedOffers': '',
         'ElectricRangeRange.From': '',
         'ElectricRangeRange.To': '',
         'SortParams.SortField': 'publishedDate',
-        'SortParams.IsAscending': 'False'
+        'SortParams.IsAscending': 'false',
+        'IgnoreSortFiltering': 'false'
+    }
+    
+    # Params format for subsequent pages
+    paginated_params = {
+        'Makes[0]': 'Tesla',
+        'Models[0]': 'Model Y',
+        'OnlyNew': 'False',
+        'OnlyWarrantyProgram': 'False',
+        'OnlyEnvironmentFriendly': 'False',
+        'OnlyFourWheelDrive': 'False',
+        'OnlyReducedPrice': 'False',
+        'OnlyDeductibleVAT': 'False',
+        'OnlyIsAuction': 'False',
+        'OnlyAuthorizedDealers': 'False',
+        'OnlyHasImage': 'False',
+        'OnlyHasVideo': 'False',
+        'OnlyHasCarfaxReport': 'False',
+        'OnlyNoBonusMalus': 'False',
+        'FreeText': '',
+        'Page': '1',
+        'IgnoreSortFiltering': 'False'
     }
     
     ua = UserAgent()
@@ -316,37 +338,33 @@ async def main():
     }
 
     async with aiohttp.ClientSession() as session:
-        page = 1
-        total_cars = 0
-        
-        while True:
-            # Add page parameter for pagination
-            params['Page'] = page
-            params['IgnoreSortFiltering'] = False
+        # First page uses different param format
+        response = await session.get(base_url, params=first_page_params, headers=headers)
+        if response.status == 200:
+            html_content = await response.text()
+            cars_found = await parse_cars(html_content, conn, session, headers)
+            total_cars = cars_found
             
-            response = await session.get(base_url, params=params, headers=headers)
-            if response.status == 200:
-                html_content = await response.text()
-                
-                # Parse cars on current page
-                cars_found = await parse_cars(html_content, conn, session, headers)
-                total_cars += cars_found
-                
-                # Check if we should continue to next page
-                if cars_found == 0:  # No more cars found on this page
+            # Subsequent pages use paginated format
+            page = 2
+            while True:
+                paginated_params['Page'] = str(page)
+                response = await session.get(base_url, params=paginated_params, headers=headers)
+                if response.status == 200:
+                    html_content = await response.text()
+                    cars_found = await parse_cars(html_content, conn, session, headers)
+                    if cars_found == 0:
+                        break
+                    total_cars += cars_found
+                    print(f"Processed page {page}, found {cars_found} cars")
+                    page += 1
+                    await human_like_delay()
+                else:
+                    print(f"Error fetching page {page}: {response.status}")
                     break
-                    
-                print(f"Processed page {page}, found {cars_found} cars")
-                page += 1
-                
-                # Add human-like delay between pages
-                await human_like_delay()
-            else:
-                print(f"Error fetching page {page}: {response.status}")
-                break
     
         print(f"Total cars processed: {total_cars}")
-        log_scraping_run(conn, total_cars, params)
+        log_scraping_run(conn, total_cars, first_page_params)
     
     conn.close()
 
