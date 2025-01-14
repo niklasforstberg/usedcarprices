@@ -10,6 +10,16 @@ import sqlite3
 from datetime import datetime
 from urllib.parse import urljoin
 
+# This program fetches data from bytbil.com and stores the information in a sqlite db.
+# Written by Niklas Förstberg, 2025 
+
+# Use this query to find price history for a car
+# SELECT ph.price, ph.timestamp 
+# FROM price_history ph 
+# JOIN cars c ON ph.car_id = c.id 
+# WHERE c.registration_number = ?
+# ORDER BY ph.timestamp DESC
+
 async def human_like_delay():
     if random.random() < 0.1:
         delay = random.uniform(8, 15)  # Occasionally take longer breaks
@@ -22,21 +32,6 @@ async def human_like_delay():
 def clean_text(text):
     # Remove HTML entities and extra whitespace
     return re.sub(r'&#xA0;', '', text).strip()
-
-def fetch_cars(url, params, headers):
-
-    response = requests.get(url, params=params, headers=headers)
-    if response.status_code != 200:
-        print(f"Error fetching data: {response.status_code}")
-        return None
-    # Save response to file with make, model and timestamp for debugging
-    timestamp = time.strftime("%Y%m%d-%H%M%S")
-    make = params.get('Makes', 'unknown')
-    models = '-'.join(params.get('Models', ['unknown'])) if isinstance(params.get('Models'), list) else params.get('Models', 'unknown')
-    filename = f'response_{make}_{models}_{timestamp}.html'
-    with open(filename, 'w', encoding='utf-8') as f:
-        f.write(response.text)
-    return response.text
 
 def setup_database():
     conn = sqlite3.connect('cars.db')
@@ -71,6 +66,17 @@ def setup_database():
             timestamp DATETIME,
             cars_found INTEGER,
             search_params TEXT
+        )
+    ''')
+    
+    # Create price_history table
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS price_history (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            car_id INTEGER,
+            price TEXT,
+            timestamp DATETIME,
+            FOREIGN KEY (car_id) REFERENCES cars(id)
         )
     ''')
     
@@ -126,14 +132,23 @@ def store_car(conn, car_data):
     c = conn.cursor()
     
     # Check if car already exists
-    c.execute('SELECT id, first_seen FROM cars WHERE registration_number = ? OR url = ?', 
+    c.execute('SELECT id, price FROM cars WHERE registration_number = ? OR url = ?', 
              (car_data.get('registration_number'), car_data['url']))
     result = c.fetchone()
     
     if result:
-        # Update existing car
-        print(f"-- Updating existing car: {car_data['title']} ")
-        car_id, first_seen = result
+        car_id, current_price = result
+        new_price = car_data['price']
+        
+        # Only store price history if price has changed
+        if current_price != new_price:
+            c.execute('''
+                INSERT INTO price_history (car_id, price, timestamp)
+                VALUES (?, ?, ?)
+            ''', (car_id, current_price, datetime.now()))
+            print(f" -- Price change detected for car {car_data.get('registration_number')}: {current_price} -> {new_price}")
+        
+        # Update existing car with new data
         c.execute('''
             UPDATE cars 
             SET title=?, make=?, model=?, year=?, mileage=?, location=?, price=?, 
@@ -156,7 +171,7 @@ def store_car(conn, car_data):
             car_id
         ))
     else:
-        # Insert new car
+        # Insert new car (no price history needed for new entries)
         now = datetime.now()
         c.execute('''
             INSERT INTO cars (
@@ -226,7 +241,13 @@ async def parse_cars(html_content, conn, session, headers, counters):
         
         # Get price
         price_elem = car.find('span', {'class': 'car-price-main'})
-        price = clean_text(price_elem.text).replace('kr', '').replace(' ', '') if price_elem else 'N/A'
+        if price_elem:
+            price_text = clean_text(price_elem.text)
+            if '/mån' in price_text:
+                continue  # Skip this car, it's a leasing offer
+            price = price_text.replace('kr', '').replace(' ', '')
+        else:
+            continue  # Skip if no price found
         
         # Store in database
         car_data = {
@@ -260,7 +281,8 @@ async def parse_cars(html_content, conn, session, headers, counters):
         else:
             counters['new'] += 1
         
-        print(f"#{counters['total']} Processed: {title} ({car_data.get('registration_number', 'N/A')}) - Price: {price}")
+        reg_num = car_data.get('registration_number', 'N/A')
+        print(f"#{counters['total']} Processed: {title} - Reg: {reg_num} - Mileage: {mileage} - Price: {price}")
     
     return page_cars
 
@@ -276,8 +298,8 @@ async def main():
     conn = setup_database()
     base_url = 'https://www.bytbil.com/bil'
 
-    make = 'Toyota'
-    model = 'Avensis'
+    make = 'Tesla'
+    model = 'Model Y'
     
     # Initial params - updated format for aiohttp
     first_page_params = {
@@ -351,6 +373,7 @@ async def main():
             # Subsequent pages use paginated format
             page = 2
             while True:
+                print(f".Fetching result page {page}")
                 paginated_params['Page'] = str(page)
                 response = await session.get(base_url, params=paginated_params, headers=headers)
                 if response.status == 200:
