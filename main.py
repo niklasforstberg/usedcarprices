@@ -132,7 +132,7 @@ def store_car(conn, car_data):
     
     if result:
         # Update existing car
-        print(f"Updating existing car: {car_data['title']} ")
+        print(f"-- Updating existing car: {car_data['title']} ")
         car_id, first_seen = result
         c.execute('''
             UPDATE cars 
@@ -185,7 +185,7 @@ def store_car(conn, car_data):
     
     conn.commit()
 
-async def parse_cars(html_content, conn, session, headers):
+async def parse_cars(html_content, conn, session, headers, counters):
     soup = BeautifulSoup(html_content, 'html.parser')
     car_list = soup.find('ul', {'class': 'result-list'})
     if not car_list:
@@ -197,9 +197,7 @@ async def parse_cars(html_content, conn, session, headers):
         print("No cars found")
         return 0
     
-    cars_found = 0
-    new_cars = 0
-    updated_cars = 0
+    page_cars = 0
     
     for car in car_items:
         # Get title and URL
@@ -254,21 +252,17 @@ async def parse_cars(html_content, conn, session, headers):
         exists = c.fetchone()
         
         store_car(conn, car_data)
-        cars_found += 1
+        counters['total'] += 1
+        page_cars += 1
         
         if exists:
-            updated_cars += 1
+            counters['updated'] += 1
         else:
-            new_cars += 1
+            counters['new'] += 1
         
-        print(f"Processed: {title} ({car_data.get('registration_number', 'N/A')}) - Price: {price}")
+        print(f"#{counters['total']} Processed: {title} ({car_data.get('registration_number', 'N/A')}) - Price: {price}")
     
-    print(f"\nSummary:")
-    print(f"Total cars processed: {cars_found}")
-    print(f"New cars added: {new_cars}")
-    print(f"Existing cars updated: {updated_cars}")
-    
-    return cars_found
+    return page_cars
 
 def log_scraping_run(conn, cars_found, search_params):
     c = conn.cursor()
@@ -281,12 +275,15 @@ def log_scraping_run(conn, cars_found, search_params):
 async def main():
     conn = setup_database()
     base_url = 'https://www.bytbil.com/bil'
+
+    make = 'Toyota'
+    model = 'Avensis'
     
     # Initial params - updated format for aiohttp
     first_page_params = {
         'VehicleType': 'bil',
-        'Makes': 'Tesla',
-        'Models': 'Model Y',
+        'Makes': make,
+        'Models': model,
         'FreeText': '',
         'Regions': '',  # URL encoding handled automatically
         'PriceRange.From': '',
@@ -311,8 +308,8 @@ async def main():
     
     # Params format for subsequent pages
     paginated_params = {
-        'Makes[0]': 'Tesla',
-        'Models[0]': 'Model Y',
+        'Makes[0]': make,
+        'Models[0]': model,
         'OnlyNew': 'False',
         'OnlyWarrantyProgram': 'False',
         'OnlyEnvironmentFriendly': 'False',
@@ -337,12 +334,18 @@ async def main():
         'Referer': 'https://www.bytbil.com/'
     }
 
+    counters = {
+        'total': 0,
+        'new': 0,
+        'updated': 0
+    }
+    
     async with aiohttp.ClientSession() as session:
         # First page uses different param format
         response = await session.get(base_url, params=first_page_params, headers=headers)
         if response.status == 200:
             html_content = await response.text()
-            cars_found = await parse_cars(html_content, conn, session, headers)
+            cars_found = await parse_cars(html_content, conn, session, headers, counters)
             total_cars = cars_found
             
             # Subsequent pages use paginated format
@@ -352,7 +355,7 @@ async def main():
                 response = await session.get(base_url, params=paginated_params, headers=headers)
                 if response.status == 200:
                     html_content = await response.text()
-                    cars_found = await parse_cars(html_content, conn, session, headers)
+                    cars_found = await parse_cars(html_content, conn, session, headers, counters)
                     if cars_found == 0:
                         break
                     total_cars += cars_found
@@ -365,6 +368,11 @@ async def main():
     
         print(f"Total cars processed: {total_cars}")
         log_scraping_run(conn, total_cars, first_page_params)
+    
+    print(f"\nFinal Summary:")
+    print(f"Total cars processed: {counters['total']}")
+    print(f"New cars added: {counters['new']}")
+    print(f"Existing cars updated: {counters['updated']}")
     
     conn.close()
 
