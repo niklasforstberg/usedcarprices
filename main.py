@@ -132,9 +132,36 @@ def store_car(conn, car_data):
     c = conn.cursor()
     
     # Check if car already exists
-    c.execute('SELECT id, price FROM cars WHERE registration_number = ? OR url = ?', 
-             (car_data.get('registration_number'), car_data['url']))
-    result = c.fetchone()
+    if (car_data.get('registration_number') is not None and 
+        car_data.get('registration_number') != 'N/A' and 
+        car_data.get('registration_number') != '-'):
+        
+        c.execute('SELECT id, price FROM cars WHERE registration_number = ?', 
+                 (car_data['registration_number'],))
+        result = c.fetchone()
+        print(f"Found by registration: {result[0] if result else None}")
+    else:
+        print("\nDEBUG URL MATCHING:")
+        print(f"Incoming URL: {car_data['url']}")
+        print(f"Title: {car_data['title']}")
+        print(f"Price: {car_data['price']}")
+        
+        # Check what's in the database
+        c.execute('SELECT id, url, title, price FROM cars WHERE url = ?', (car_data['url'],))
+        matches = c.fetchall()
+        
+        print(f"Number of matches: {len(matches)}")
+        for match in matches:
+            print(f"DB ID: {match[0]}")
+            print(f"DB URL: {match[1]}")
+            print(f"DB Title: {match[2]}")
+            print(f"DB Price: {match[3]}")
+            print(f"URLs equal?: {match[1] == car_data['url']}")
+            print(f"URL lengths: DB={len(match[1])} vs Incoming={len(car_data['url'])}")
+        
+        c.execute('SELECT id, price FROM cars WHERE url = ?', 
+                 (car_data['url'],))
+        result = c.fetchone()
     
     if result:
         car_id, current_price = result
@@ -298,8 +325,8 @@ async def main():
     conn = setup_database()
     base_url = 'https://www.bytbil.com/bil'
 
-    make = 'Tesla'
-    model = 'Model Y'
+    make = 'Volvo'
+    model = '240'
     
     # Initial params - updated format for aiohttp
     first_page_params = {
