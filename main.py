@@ -131,7 +131,7 @@ async def fetch_car_details(session, url, headers):
 def store_car(conn, car_data):
     c = conn.cursor()
     
-    # Check if car already exists
+    # Check if car already exists, first by car registration number
     if (car_data.get('registration_number') is not None and 
         car_data.get('registration_number') != 'N/A' and 
         car_data.get('registration_number') != '-'):
@@ -139,31 +139,14 @@ def store_car(conn, car_data):
         c.execute('SELECT id, price FROM cars WHERE registration_number = ?', 
                  (car_data['registration_number'],))
         result = c.fetchone()
-        print(f"Found by registration: {result[0] if result else None}")
     else:
-        print("\nDEBUG URL MATCHING:")
-        print(f"Incoming URL: {car_data['url']}")
-        print(f"Title: {car_data['title']}")
-        print(f"Price: {car_data['price']}")
-        
-        # Check what's in the database
-        c.execute('SELECT id, url, title, price FROM cars WHERE url = ?', (car_data['url'],))
-        matches = c.fetchall()
-        
-        print(f"Number of matches: {len(matches)}")
-        for match in matches:
-            print(f"DB ID: {match[0]}")
-            print(f"DB URL: {match[1]}")
-            print(f"DB Title: {match[2]}")
-            print(f"DB Price: {match[3]}")
-            print(f"URLs equal?: {match[1] == car_data['url']}")
-            print(f"URL lengths: DB={len(match[1])} vs Incoming={len(car_data['url'])}")
-        
+        #check by url if no car reg
         c.execute('SELECT id, price FROM cars WHERE url = ?', 
                  (car_data['url'],))
         result = c.fetchone()
     
     if result:
+        #Car found, update it
         car_id, current_price = result
         new_price = car_data['price']
         
@@ -198,7 +181,7 @@ def store_car(conn, car_data):
             car_id
         ))
     else:
-        # Insert new car (no price history needed for new entries)
+        # Insert new car
         now = datetime.now()
         c.execute('''
             INSERT INTO cars (
@@ -227,7 +210,7 @@ def store_car(conn, car_data):
     
     conn.commit()
 
-async def parse_cars(html_content, conn, session, headers, counters):
+async def parse_cars(html_content, conn, session, headers, counters, make, model):
     soup = BeautifulSoup(html_content, 'html.parser')
     car_list = soup.find('ul', {'class': 'result-list'})
     if not car_list:
@@ -250,12 +233,7 @@ async def parse_cars(html_content, conn, session, headers, counters):
         title = title_elem.find('a').text.strip()
         relative_url = title_elem.find('a')['href']
         url = urljoin('https://www.bytbil.com', relative_url)
-        
-        # Try to extract make and model from title
-        title_parts = title.split(' ', 2)
-        make = title_parts[0] if len(title_parts) > 0 else 'Unknown'
-        model = title_parts[1] if len(title_parts) > 1 else 'Unknown'
-        
+
         # Get year, mileage and location
         details = car.find('p', {'class': 'uk-text-truncate'})
         if not details:
@@ -325,8 +303,8 @@ async def main():
     conn = setup_database()
     base_url = 'https://www.bytbil.com/bil'
 
-    make = 'Volvo'
-    model = '240'
+    make = 'Mercedes-Benz'
+    model = 'S-Klass'
     
     # Initial params - updated format for aiohttp
     first_page_params = {
@@ -394,7 +372,7 @@ async def main():
         response = await session.get(base_url, params=first_page_params, headers=headers)
         if response.status == 200:
             html_content = await response.text()
-            cars_found = await parse_cars(html_content, conn, session, headers, counters)
+            cars_found = await parse_cars(html_content, conn, session, headers, counters, make, model)
             total_cars = cars_found
             
             # Subsequent pages use paginated format
@@ -405,7 +383,7 @@ async def main():
                 response = await session.get(base_url, params=paginated_params, headers=headers)
                 if response.status == 200:
                     html_content = await response.text()
-                    cars_found = await parse_cars(html_content, conn, session, headers, counters)
+                    cars_found = await parse_cars(html_content, conn, session, headers, counters, make, model)
                     if cars_found == 0:
                         break
                     total_cars += cars_found
