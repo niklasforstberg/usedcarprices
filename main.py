@@ -287,7 +287,7 @@ async def parse_cars(html_content, conn, session, headers, counters, make, model
             counters['new'] += 1
         
         reg_num = car_data.get('registration_number', 'N/A')
-        print(f"#{counters['total']} Processed: {title} - Reg: {reg_num} - Mileage: {mileage} - Price: {price}")
+        print(f"#{counters['total']} Processed: {title} {year}  {mileage} {reg_num} {price}kr")
     
     return page_cars
 
@@ -304,9 +304,9 @@ async def main():
     base_url = 'https://www.bytbil.com/bil'
 
     make = 'Mercedes-Benz'
-    model = 'S-Klass'
+    model = 'GLC'
     
-    # Initial params - updated format for aiohttp
+    # Initial params
     first_page_params = {
         'VehicleType': 'bil',
         'Makes': make,
