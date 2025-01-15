@@ -9,6 +9,7 @@ from fake_useragent import UserAgent
 import sqlite3
 from datetime import datetime
 from urllib.parse import urljoin
+import argparse
 
 # This program fetches data from bytbil.com and stores the information in a sqlite db.
 # Written by Niklas Förstberg, 2025 
@@ -95,34 +96,34 @@ async def fetch_car_details(session, url, headers):
             html_content = await response.text()
             soup = BeautifulSoup(html_content, 'html.parser')
             
-            details = {}
+            more_car_data = {}
             
             # Find registration number
             reg_elem = soup.find('dt', string='Regnr')
             if reg_elem and reg_elem.find_next_sibling('dd'):
-                details['registration_number'] = reg_elem.find_next_sibling('dd').text.strip()
+                more_car_data['registration_number'] = reg_elem.find_next_sibling('dd').text.strip()
             
             # Find color
             color_elem = soup.find('dt', string='Färg')
             if color_elem and color_elem.find_next_sibling('dd'):
-                details['color'] = color_elem.find_next_sibling('dd').text.strip()
+                more_car_data['color'] = color_elem.find_next_sibling('dd').text.strip()
             
             # Find drive type
             drive_elem = soup.find('dt', string='Drivhjul')
             if drive_elem and drive_elem.find_next_sibling('dd'):
-                details['drive_type'] = drive_elem.find_next_sibling('dd').text.strip()
+                more_car_data['drive_type'] = drive_elem.find_next_sibling('dd').text.strip()
             
             # Find gearbox
             gearbox_elem = soup.find('dt', string='Växellåda')
             if gearbox_elem and gearbox_elem.find_next_sibling('dd'):
-                details['gearbox'] = gearbox_elem.find_next_sibling('dd').text.strip()
+                more_car_data['gearbox'] = gearbox_elem.find_next_sibling('dd').text.strip()
             
             # Find bodytype
             bodytype_elem = soup.find('dt', string='Karosseri')
             if bodytype_elem and bodytype_elem.find_next_sibling('dd'):
-                details['bodytype'] = bodytype_elem.find_next_sibling('dd').text.strip()
+                more_car_data['bodytype'] = bodytype_elem.find_next_sibling('dd').text.strip()
             
-            return details
+            return more_car_data
             
     except Exception as e:
         print(f"Error fetching car details: {e}")
@@ -254,7 +255,7 @@ async def parse_cars(html_content, conn, session, headers, counters, make, model
         else:
             continue  # Skip if no price found
         
-        # Store in database
+        # Data to store in database
         car_data = {
             'title': title,
             'make': make,
@@ -267,9 +268,9 @@ async def parse_cars(html_content, conn, session, headers, counters, make, model
         }
         
         # Fetch additional details
-        car_details = await fetch_car_details(session, url, headers)
-        if car_details:
-            car_data.update(car_details)
+        more_car_data = await fetch_car_details(session, url, headers)
+        if more_car_data:
+            car_data.update(more_car_data)
         
         # Check if car exists before storing
         c = conn.cursor()
@@ -300,11 +301,20 @@ def log_scraping_run(conn, cars_found, search_params):
     conn.commit()
 
 async def main():
+
+    make = 'Toyota'
+    model = 'Avensis'
+
+    parser = argparse.ArgumentParser(description='Scrape car listings from bytbil.com')
+    parser.add_argument('--make', type=str, default=make, help='Car manufacturer')
+    parser.add_argument('--model', type=str, default=model, help='Car model')
+    args = parser.parse_args()
+
+    make = args.make
+    model = args.model
+
     conn = setup_database()
     base_url = 'https://www.bytbil.com/bil'
-
-    make = 'Mercedes-Benz'
-    model = 'GLC'
     
     # Initial params
     first_page_params = {
@@ -380,6 +390,7 @@ async def main():
             while True:
                 print(f".Fetching result page {page}")
                 paginated_params['Page'] = str(page)
+                await human_like_delay()
                 response = await session.get(base_url, params=paginated_params, headers=headers)
                 if response.status == 200:
                     html_content = await response.text()
@@ -389,7 +400,6 @@ async def main():
                     total_cars += cars_found
                     print(f"Processed page {page}, found {cars_found} cars")
                     page += 1
-                    await human_like_delay()
                 else:
                     print(f"Error fetching page {page}: {response.status}")
                     break
