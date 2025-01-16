@@ -197,5 +197,23 @@ def predict_car_price(make=None, model=None):
     plt.tight_layout()
     plt.show()
 
+def display_inventory_counts():
+    conn = sqlite3.connect('cars.db')
+    
+    model_counts = pd.read_sql_query(
+        "SELECT make, model, COUNT(*) as count FROM cars GROUP BY make, model ORDER BY make, count DESC", 
+        conn
+    )
+    
+    print("\n=== Available Cars by Make and Model ===")
+    for make in model_counts['make'].unique():
+        make_models = model_counts[model_counts['make'] == make]
+        total = make_models['count'].sum()
+        print(f"\n{make} (Total: {total}):")
+        print(make_models[['model', 'count']].to_string(index=False))
+    
+    conn.close()
+
 if __name__ == "__main__":
+    display_inventory_counts()
     predict_car_price(MAKE, MODEL)
