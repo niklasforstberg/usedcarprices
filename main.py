@@ -13,6 +13,11 @@ import argparse
 
 # This program fetches data from bytbil.com and stores the information in a sqlite db.
 # Written by Niklas Förstberg, 2025 
+#
+# Todo: fundera på om man ska ha en switch som gör att man kan välja om man ska hämta car details om vi redan har bilen(Och priset inte har ändrats?).
+# Todo: ta bort leasingbilar som har /MÅN eller /MÅNAD eller varianter på det.
+# Todo: Check memory useage och se om man kan optimera det.
+
 
 # Use this query to find price history for a car
 # SELECT ph.price, ph.timestamp 
@@ -215,7 +220,7 @@ async def parse_cars(html_content, conn, session, headers, counters, make, model
     soup = BeautifulSoup(html_content, 'html.parser')
     car_list = soup.find('ul', {'class': 'result-list'})
     if not car_list:
-        print("No car list found")
+        print("No more cars found")
         return 0
         
     car_items = car_list.find_all('li', {'class': 'result-list-item'})
@@ -304,6 +309,8 @@ async def main():
 
     make = 'Toyota'
     model = 'Avensis'
+
+    start_time = time.time() 
 
     parser = argparse.ArgumentParser(description='Scrape car listings from bytbil.com')
     parser.add_argument('--make', type=str, default=make, help='Car manufacturer')
@@ -411,7 +418,12 @@ async def main():
     print(f"Total cars processed: {counters['total']}")
     print(f"New cars added: {counters['new']}")
     print(f"Existing cars updated: {counters['updated']}")
-    
+    execution_time = time.time() - start_time
+    hours = execution_time // 3600
+    minutes = (execution_time % 3600) // 60
+    seconds = execution_time % 60
+    print(f"{int(hours)}h {int(minutes)}m {seconds:.2f}s")
+
     conn.close()
 
 if __name__ == "__main__":
