@@ -15,7 +15,6 @@ import argparse
 # Written by Niklas Förstberg, 2025 
 #
 # Todo: fundera på om man ska ha en switch som gör att man kan välja om man ska hämta car details om vi redan har bilen(Och priset inte har ändrats?).
-# Todo: ta bort leasingbilar som har /MÅN eller /MÅNAD eller varianter på det.
 # Todo: Check memory useage och se om man kan optimera det.
 # Todo: enable cancel search
 
@@ -134,10 +133,10 @@ async def fetch_car_details(session, url, headers):
         print(f"Error fetching car details: {e}")
         return None
 
-def store_car(conn, car_data):
-    c = conn.cursor()
-    
+def store_car(conn, car_data, c):
+
     # Check if car already exists, first by car registration number
+    # We already checked this in parse_cars, but a car might have been relisted with a new URL
     if (car_data.get('registration_number') is not None and 
         car_data.get('registration_number') != 'N/A' and 
         car_data.get('registration_number') != '-'):
@@ -164,28 +163,25 @@ def store_car(conn, car_data):
             ''', (car_id, current_price, datetime.now()))
             print(f" -- Price change detected for car {car_data.get('registration_number')}: {current_price} -> {new_price}")
         
-        # Update existing car with new data
-        c.execute('''
-            UPDATE cars 
-            SET title=?, make=?, model=?, year=?, mileage=?, location=?, price=?, 
-                registration_number=?, color=?, drive_type=?, gearbox=?, bodytype=?, last_seen=?
-            WHERE id=?
-        ''', (
-            car_data['title'], 
-            car_data['make'],
-            car_data['model'],
-            car_data['year'],
-            car_data['mileage'],
-            car_data['location'],
-            car_data['price'],
-            car_data.get('registration_number'),
-            car_data.get('color'),
-            car_data.get('drive_type'),
-            car_data.get('gearbox'),
-            car_data.get('bodytype'),
-            datetime.now(),
-            car_id
-        ))
+        # Update only the fields we have
+        update_fields = {
+            'title': car_data['title'],
+            'make': car_data['make'],
+            'model': car_data['model'],
+            'year': car_data['year'],
+            'mileage': car_data['mileage'],
+            'location': car_data['location'],
+            'price': car_data['price'],
+            'last_seen': datetime.now()
+        }
+        
+        # Build dynamic update query
+        fields = ', '.join(f"{key}=?" for key in update_fields.keys())
+        query = f'UPDATE cars SET {fields} WHERE id=?'
+        
+        # Execute update with values
+        values = list(update_fields.values()) + [car_id]
+        c.execute(query, values)
     else:
         # Insert new car
         now = datetime.now()
@@ -229,26 +225,9 @@ async def parse_cars(html_content, conn, session, headers, counters, make, model
         return 0
     
     page_cars = 0
+    c = conn.cursor()  # Create cursor once for all checks
     
     for car in car_items:
-        # Get title and URL
-        title_elem = car.find('h3', {'class': 'car-list-header'})
-        if not title_elem or not title_elem.find('a'):
-            continue
-            
-        title = title_elem.find('a').text.strip()
-        relative_url = title_elem.find('a')['href']
-        url = urljoin('https://www.bytbil.com', relative_url)
-
-        # Get year, mileage and location
-        details = car.find('p', {'class': 'uk-text-truncate'})
-        if not details:
-            continue
-            
-        details_text = [d.strip() for d in details.text.split('|')]
-        year = clean_text(details_text[0])
-        mileage = clean_text(details_text[1]) if len(details_text) > 1 else 'N/A'
-        location = clean_text(details_text[2]) if len(details_text) > 2 else 'N/A'
         
         # Get price
         price_elem = car.find('span', {'class': 'car-price-main'})
@@ -259,6 +238,29 @@ async def parse_cars(html_content, conn, session, headers, counters, make, model
             price = price_text.replace('kr', '').replace(' ', '')
         else:
             continue  # Skip if no price found
+
+        # Get title
+        title_elem = car.find('h3', {'class': 'car-list-header'})
+        if not title_elem or not title_elem.find('a'):
+            continue
+        title = title_elem.find('a').text.strip()
+
+        #Get URL
+        relative_url = title_elem.find('a')['href']
+        url = urljoin('https://www.bytbil.com', relative_url)
+
+        # Check if car exists before fetching details
+        c.execute('SELECT id FROM cars WHERE url = ?', (url,))
+        exists = c.fetchone()
+
+        # Get year, mileage and location
+        details = car.find('p', {'class': 'uk-text-truncate'})
+        if not details:
+            continue        
+        details_text = [d.strip() for d in details.text.split('|')]
+        year = clean_text(details_text[0])
+        mileage = clean_text(details_text[1]) if len(details_text) > 1 else 'N/A'
+        location = clean_text(details_text[2]) if len(details_text) > 2 else 'N/A'
         
         # Data to store in database
         car_data = {
@@ -272,18 +274,13 @@ async def parse_cars(html_content, conn, session, headers, counters, make, model
             'url': url
         }
         
-        # Fetch additional details
-        more_car_data = await fetch_car_details(session, url, headers)
-        if more_car_data:
-            car_data.update(more_car_data)
+        # Only fetch additional details if car doesn't exist
+        if not exists:
+            more_car_data = await fetch_car_details(session, url, headers)
+            if more_car_data:
+                car_data.update(more_car_data)
         
-        # Check if car exists before storing
-        c = conn.cursor()
-        c.execute('SELECT id FROM cars WHERE registration_number = ? OR url = ?', 
-                 (car_data.get('registration_number'), car_data['url']))
-        exists = c.fetchone()
-        
-        store_car(conn, car_data)
+        store_car(conn, car_data, c)
         counters['total'] += 1
         page_cars += 1
         
