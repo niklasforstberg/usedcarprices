@@ -10,11 +10,11 @@ import sqlite3
 from datetime import datetime
 from urllib.parse import urljoin
 import argparse
+import signal
 
 # This program fetches data from bytbil.com and stores the information in a sqlite db.
 # Written by Niklas Förstberg, 2025 
 #
-# Todo: fundera på om man ska ha en switch som gör att man kan välja om man ska hämta car details om vi redan har bilen(Och priset inte har ändrats?).
 # Todo: Check memory useage och se om man kan optimera det.
 # Todo: enable cancel search
 
@@ -27,9 +27,9 @@ import argparse
 
 async def human_like_delay():
     if random.random() < 0.1:
-        delay = random.uniform(8, 15)  # Occasionally take longer breaks
+        delay = random.uniform(5, 9)  # Occasionally take longer breaks
     else:
-        delay = random.uniform(2, 7)   # Normal browsing delays
+        delay = random.uniform(2, 5)   # Normal browsing delays
     delay += random.random() * 0.5     # Add some noise
     print(f"Sleeping for {delay} seconds")
     await asyncio.sleep(delay)
@@ -212,7 +212,10 @@ def store_car(conn, car_data, c):
     
     conn.commit()
 
-async def parse_cars(html_content, conn, session, headers, counters, make, model):
+async def parse_cars(html_content, conn, session, headers, counters, make, model, stop_flag):
+    if stop_flag.is_set():
+        return 0
+    
     soup = BeautifulSoup(html_content, 'html.parser')
     car_list = soup.find('ul', {'class': 'result-list'})
     if not car_list:
@@ -228,6 +231,8 @@ async def parse_cars(html_content, conn, session, headers, counters, make, model
     c = conn.cursor()  # Create cursor once for all checks
     
     for car in car_items:
+        if stop_flag.is_set():
+            return page_cars
         
         # Get price
         price_elem = car.find('span', {'class': 'car-price-main'})
@@ -303,6 +308,16 @@ def log_scraping_run(conn, cars_found, search_params):
     conn.commit()
 
 async def main():
+    stop_flag = asyncio.Event()
+    
+    def signal_handler():
+        print("\nStopping gracefully... Please wait for current operations to complete.")
+        stop_flag.set()
+
+    # Setup signal handlers
+    loop = asyncio.get_running_loop()
+    for sig in (signal.SIGINT, signal.SIGTERM):
+        loop.add_signal_handler(sig, signal_handler)
 
     make = 'Toyota'
     model = 'Avensis'
@@ -386,7 +401,7 @@ async def main():
         response = await session.get(base_url, params=first_page_params, headers=headers)
         if response.status == 200:
             html_content = await response.text()
-            cars_found = await parse_cars(html_content, conn, session, headers, counters, make, model)
+            cars_found = await parse_cars(html_content, conn, session, headers, counters, make, model, stop_flag)
             total_cars = cars_found
             
             # Subsequent pages use paginated format
@@ -398,7 +413,7 @@ async def main():
                 response = await session.get(base_url, params=paginated_params, headers=headers)
                 if response.status == 200:
                     html_content = await response.text()
-                    cars_found = await parse_cars(html_content, conn, session, headers, counters, make, model)
+                    cars_found = await parse_cars(html_content, conn, session, headers, counters, make, model, stop_flag)
                     if cars_found == 0:
                         break
                     total_cars += cars_found
