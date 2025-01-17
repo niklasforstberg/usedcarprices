@@ -17,7 +17,7 @@ import argparse
 # Todo: fundera på om man ska ha en switch som gör att man kan välja om man ska hämta car details om vi redan har bilen(Och priset inte har ändrats?).
 # Todo: ta bort leasingbilar som har /MÅN eller /MÅNAD eller varianter på det.
 # Todo: Check memory useage och se om man kan optimera det.
-
+# Todo: enable cancel search
 
 # Use this query to find price history for a car
 # SELECT ph.price, ph.timestamp 
@@ -254,7 +254,7 @@ async def parse_cars(html_content, conn, session, headers, counters, make, model
         price_elem = car.find('span', {'class': 'car-price-main'})
         if price_elem:
             price_text = clean_text(price_elem.text)
-            if '/mån' in price_text:
+            if any(variant in price_text.lower() for variant in ['/mån', '/månad']):
                 continue  # Skip this car, it's a leasing offer
             price = price_text.replace('kr', '').replace(' ', '')
         else:
