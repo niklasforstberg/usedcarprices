@@ -16,7 +16,6 @@ import signal
 # Written by Niklas Förstberg, 2025 
 #
 # Todo: Check memory useage och se om man kan optimera det.
-# Todo: enable cancel search
 
 # Use this query to find price history for a car
 # SELECT ph.price, ph.timestamp 
@@ -35,8 +34,8 @@ async def human_like_delay():
     await asyncio.sleep(delay)
 
 def clean_text(text):
-    # Remove HTML entities and extra whitespace
-    return re.sub(r'&#xA0;', '', text).strip()
+    # Remove HTML entities and all whitespace
+    return re.sub(r'(?:&#xA0;|\s+)', '', text).strip()
 
 def setup_database():
     conn = sqlite3.connect('cars.db')
@@ -264,7 +263,7 @@ async def parse_cars(html_content, conn, session, headers, counters, make, model
             continue        
         details_text = [d.strip() for d in details.text.split('|')]
         year = clean_text(details_text[0])
-        mileage = clean_text(details_text[1]) if len(details_text) > 1 else 'N/A'
+        mileage = clean_text(details_text[1]).replace('mil', '') if len(details_text) > 1 else 'N/A'
         location = clean_text(details_text[2]) if len(details_text) > 2 else 'N/A'
         
         # Data to store in database
