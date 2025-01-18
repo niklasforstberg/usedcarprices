@@ -34,8 +34,8 @@ async def human_like_delay():
     await asyncio.sleep(delay)
 
 def clean_text(text):
-    # Remove HTML entities and all whitespace
-    return re.sub(r'(?:&#xA0;|\s+)', '', text).strip()
+    # Remove HTML entities and all whitespace including non-breaking spaces
+    return re.sub(r'(?:&#xA0;|\xa0|\s+)', '', text).strip()
 
 def setup_database():
     conn = sqlite3.connect('cars.db')
