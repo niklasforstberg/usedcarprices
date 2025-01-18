@@ -16,6 +16,7 @@ import signal
 # Written by Niklas Förstberg, 2025 
 #
 # Todo: Check memory useage och se om man kan optimera det.
+# Todo: add the run id to the cars table
 
 # Use this query to find price history for a car
 # SELECT ph.price, ph.timestamp 
@@ -293,8 +294,8 @@ async def parse_cars(html_content, conn, session, headers, counters, make, model
         else:
             counters['new'] += 1
         
-        reg_num = car_data.get('registration_number', 'N/A')
-        print(f"#{counters['total']} Processed: {title} {year}  {mileage} {reg_num} {price}kr")
+        reg_num = car_data.get('registration_number', '')
+        print(f"#{counters['total']} Processed: {title} {year}  {mileage} mil [{reg_num}] {price}kr")
     
     return page_cars
 
@@ -422,8 +423,7 @@ async def main():
                     print(f"Error fetching page {page}: {response.status}")
                     break
     
-        print(f"Total cars processed: {total_cars}")
-        log_scraping_run(conn, total_cars, first_page_params)
+    log_scraping_run(conn, total_cars, first_page_params)
     
     print(f"\nFinal Summary:")
     print(f"Total cars processed: {counters['total']}")
