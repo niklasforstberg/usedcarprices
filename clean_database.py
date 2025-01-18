@@ -4,7 +4,7 @@ def clean_price_field():
     conn = sqlite3.connect('cars.db')
     cursor = conn.cursor()
     
-    cursor.execute("SELECT id, price FROM cars")
+    cursor.execute("SELECT id, price FROM price_history")
     records = cursor.fetchall()
     
     print(f"Found {len(records)} records to process")
@@ -15,8 +15,8 @@ def clean_price_field():
         # Clean both regular spaces and non-breaking spaces (\xa0)
         clean_price = price.replace('\xa0', '').replace(' ', '')
         if clean_price != price:
-            cursor.execute("UPDATE cars SET price = ? WHERE id = ?", (clean_price, record_id))
-            print(f"Cleaned price for id {record_id}: {price} -> {clean_price}")
+            cursor.execute("UPDATE price_history SET price = ? WHERE id = ?", (clean_price, record_id))
+            print(f"Cleaned price_history for id {record_id}: {price} -> {clean_price}")
             cleaned_count += 1
     
     conn.commit()
