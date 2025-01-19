@@ -60,7 +60,8 @@ def setup_database():
             bodytype TEXT,
             first_seen DATETIME,
             last_seen DATETIME,
-            url TEXT
+            url TEXT,
+            scraping_run_id INTEGER REFERENCES scraping_logs(id)
         )
     ''')
     
@@ -133,7 +134,7 @@ async def fetch_car_details(session, url, headers):
         print(f"Error fetching car details: {e}")
         return None
 
-def store_car(conn, car_data, c):
+def store_car(conn, car_data, c, scraping_run_id):
 
     # Check if car already exists, first by car registration number
     # We already checked this in parse_cars, but a car might have been relisted with a new URL
@@ -172,7 +173,8 @@ def store_car(conn, car_data, c):
             'mileage': car_data['mileage'],
             'location': car_data['location'],
             'price': car_data['price'],
-            'last_seen': datetime.now()
+            'last_seen': datetime.now(),
+            'scraping_run_id': scraping_run_id
         }
         
         # Build dynamic update query
@@ -189,9 +191,9 @@ def store_car(conn, car_data, c):
             INSERT INTO cars (
                 title, make, model, year, mileage, location, price, url, 
                 registration_number, color, drive_type, gearbox, bodytype,
-                first_seen, last_seen
+                first_seen, last_seen, scraping_run_id
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ''', (
             car_data['title'],
             car_data['make'],
@@ -207,12 +209,13 @@ def store_car(conn, car_data, c):
             car_data.get('gearbox'),
             car_data.get('bodytype'),
             now,
-            now
+            now,
+            scraping_run_id
         ))
     
     conn.commit()
 
-async def parse_cars(html_content, conn, session, headers, counters, make, model, stop_flag):
+async def parse_cars(html_content, conn, session, headers, counters, make, model, stop_flag, scraping_run_id):
     if stop_flag.is_set():
         return 0
     
@@ -285,7 +288,7 @@ async def parse_cars(html_content, conn, session, headers, counters, make, model
             if more_car_data:
                 car_data.update(more_car_data)
         
-        store_car(conn, car_data, c)
+        store_car(conn, car_data, c, scraping_run_id)
         counters['total'] += 1
         page_cars += 1
         
@@ -299,12 +302,20 @@ async def parse_cars(html_content, conn, session, headers, counters, make, model
     
     return page_cars
 
-def log_scraping_run(conn, cars_found, search_params):
+def log_scraping_run(conn, search_params):
     c = conn.cursor()
     c.execute('''
-        INSERT INTO scraping_logs (timestamp, cars_found, search_params)
-        VALUES (?, ?, ?)
-    ''', (datetime.now(), cars_found, str(search_params)))
+        INSERT INTO scraping_logs (timestamp, search_params)
+        VALUES (?, ?)
+    ''', (datetime.now(), str(search_params)))
+    scraping_run_id = c.lastrowid
+    conn.commit()
+    return scraping_run_id
+    
+
+def update_scraping_run(conn, scraping_run_id, cars_found):
+    c = conn.cursor()
+    c.execute('UPDATE scraping_logs SET cars_found = ? WHERE id = ?', (cars_found, scraping_run_id))
     conn.commit()
 
 async def main():
@@ -395,13 +406,15 @@ async def main():
         'new': 0,
         'updated': 0
     }
+
+    scraping_run_id = log_scraping_run(conn, first_page_params)
     
     async with aiohttp.ClientSession() as session:
         # First page uses different param format
         response = await session.get(base_url, params=first_page_params, headers=headers)
         if response.status == 200:
             html_content = await response.text()
-            cars_found = await parse_cars(html_content, conn, session, headers, counters, make, model, stop_flag)
+            cars_found = await parse_cars(html_content, conn, session, headers, counters, make, model, stop_flag, scraping_run_id)
             total_cars = cars_found
             
             # Subsequent pages use paginated format
@@ -413,7 +426,7 @@ async def main():
                 response = await session.get(base_url, params=paginated_params, headers=headers)
                 if response.status == 200:
                     html_content = await response.text()
-                    cars_found = await parse_cars(html_content, conn, session, headers, counters, make, model, stop_flag)
+                    cars_found = await parse_cars(html_content, conn, session, headers, counters, make, model, stop_flag, scraping_run_id)
                     if cars_found == 0:
                         break
                     total_cars += cars_found
@@ -423,7 +436,7 @@ async def main():
                     print(f"Error fetching page {page}: {response.status}")
                     break
     
-    log_scraping_run(conn, total_cars, first_page_params)
+    update_scraping_run(conn, scraping_run_id, total_cars)
     
     print(f"\nFinal Summary:")
     print(f"Total cars processed: {counters['total']}")
