@@ -16,7 +16,7 @@ import signal
 # Written by Niklas Förstberg, 2025 
 #
 # Todo: Check memory useage och se om man kan optimera det.
-# Todo: add the run id to the cars table
+# Todo: Add functionality to scrape for several different makes in the same run
 
 # Use this query to find price history for a car
 # SELECT ph.price, ph.timestamp 
