@@ -318,7 +318,7 @@ def update_scraping_run(conn, scraping_run_id, cars_found):
     c.execute('UPDATE scraping_logs SET cars_found = ? WHERE id = ?', (cars_found, scraping_run_id))
     conn.commit()
 
-async def main():
+async def run_search(make, model):
     stop_flag = asyncio.Event()
     
     def signal_handler():
@@ -329,19 +329,6 @@ async def main():
     loop = asyncio.get_running_loop()
     for sig in (signal.SIGINT, signal.SIGTERM):
         loop.add_signal_handler(sig, signal_handler)
-
-    make = 'Toyota'
-    model = 'Avensis'
-
-    start_time = time.time() 
-
-    parser = argparse.ArgumentParser(description='Scrape car listings from bytbil.com')
-    parser.add_argument('--make', type=str, default=make, help='Car manufacturer')
-    parser.add_argument('--model', type=str, default=model, help='Car model')
-    args = parser.parse_args()
-
-    make = args.make
-    model = args.model
 
     conn = setup_database()
     base_url = 'https://www.bytbil.com/bil'
@@ -442,13 +429,42 @@ async def main():
     print(f"Total cars processed: {counters['total']}")
     print(f"New cars added: {counters['new']}")
     print(f"Existing cars updated: {counters['updated']}")
+
+    conn.close()
+
+async def main():
+
+    start_time = time.time() 
+
+    # Default searches if no arguments provided
+    default_searches = [
+        {'make': 'Toyota', 'model': 'Avensis'},
+        {'make': 'Tesla', 'model': 'Model Y'},
+        {'make': 'Mercedes-Benz', 'model': 'S-Klass'},
+        {'make': 'Tesla', 'model': 'Model 3'},
+        {'make': 'Tesla', 'model': 'Model X'},
+        {'make': 'Tesla', 'model': 'Model S'}
+    ]
+    
+    parser = argparse.ArgumentParser(description='Scrape car listings from bytbil.com')
+    parser.add_argument('--make', type=str, help='Car manufacturer')
+    parser.add_argument('--model', type=str, help='Car model')
+    args = parser.parse_args()
+
+    if args.make and args.model:
+        # Single search with provided arguments
+        await run_search(args.make, args.model)
+    else:
+        # Run all default searches
+        for search in default_searches:
+            print(f"\nStarting search for {search['make']} {search['model']}")
+            await run_search(search['make'], search['model'])
+    
     execution_time = time.time() - start_time
     hours = execution_time // 3600
     minutes = (execution_time % 3600) // 60
     seconds = execution_time % 60
     print(f"{int(hours)}h {int(minutes)}m {seconds:.2f}s")
-
-    conn.close()
 
 if __name__ == "__main__":
     asyncio.run(main()) 
