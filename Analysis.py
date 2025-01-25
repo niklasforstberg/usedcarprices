@@ -5,6 +5,7 @@ import seaborn as sns
 from datetime import datetime
 import numpy as np
 from sklearn.linear_model import LinearRegression
+import argparse
 
 # Define your filters here
 MAKE = "Tesla"  # Set to None to see all makes
@@ -215,5 +216,14 @@ def display_inventory_counts():
     conn.close()
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description='Analyze car data from the database')
+    parser.add_argument('--make', type=str, help='Car manufacturer (e.g. Tesla)')
+    parser.add_argument('--model', type=str, help='Car model (e.g. Model Y)')
+    args = parser.parse_args()
+
+    # Override global constants if arguments provided
+    make = args.make if args.make else MAKE
+    model = args.model if args.model else MODEL
+
     display_inventory_counts()
-    predict_car_price(MAKE, MODEL)
+    predict_car_price(make, model)
